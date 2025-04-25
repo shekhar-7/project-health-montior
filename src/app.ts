@@ -10,6 +10,7 @@ import os from 'os';
 import path from 'path';
 
 import userRoutes from './routes/user.routes';
+import monitoringRoutes from './routes/monitoring.routes';
 
 // Load environment variables
 dotenv.config();
@@ -96,7 +97,7 @@ app.use(
 
 // Routes
 app.use('/api/users', userRoutes);
-
+app.use('/api/monitoring', monitoringRoutes);
 // Test route
 app.get('/test', (req, res) => {
   res.json({
