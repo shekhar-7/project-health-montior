@@ -368,6 +368,42 @@ router.get(
   dashboardController.getReleases.bind(dashboardController)
 );
 
+/**
+ * @swagger
+ * /api/dashboard/gitlab-projects:
+ *   get:
+ *     summary: Get all GitLab projects with their release counts
+ *     tags: [Dashboard]
+ *     responses:
+ *       200:
+ *         description: GitLab projects with release counts retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: number
+ *                     description: Project ID
+ *                   name:
+ *                     type: string
+ *                     description: Project name
+ *                   description:
+ *                     type: string
+ *                     description: Project description
+ *                   releaseCount:
+ *                     type: number
+ *                     description: Number of releases (tags) in the project
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/gitlab-projects",
+  dashboardController.getGitLabProjects.bind(dashboardController)
+);
+
 // Get metrics
 router.get("/metrics", (req, res) => dashboardController.getMetrics(req, res));
 

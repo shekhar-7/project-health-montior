@@ -133,40 +133,41 @@ router.get('/transactions', protect as unknown as RequestHandler, async (req, re
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
     const skip = (page - 1) * limit;
 
-    // Build query
-    const query: any = {};
-    if (req.query.method) {
-      query.method = req.query.method;
-    }
-    if (req.query.status) {
-      query.responseStatus = parseInt(req.query.status as string);
-    }
-
-    const transactions = await ApiTransaction.find(query)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await ApiTransaction.countDocuments(query);
-
-    res.json({
-      status: 'success',
-      data: {
-        transactions,
-        pagination: {
-          total,
-          page,
-          pages: Math.ceil(total / limit)
-        }
+      // Build query
+      const query: any = {};
+      if (req.query.method) {
+        query.method = req.query.method;
       }
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: 'Error fetching transactions'
-    });
+      if (req.query.status) {
+        query.responseStatus = parseInt(req.query.status as string);
+      }
+
+      const transactions = await ApiTransaction.find(query)
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const total = await ApiTransaction.countDocuments(query);
+
+      res.json({
+        status: "success",
+        data: {
+          transactions,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: "error",
+        message: "Error fetching transactions",
+      });
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -414,49 +415,52 @@ router.get('/transactions/stats', protect as unknown as RequestHandler, async (r
       ])
     ]);
 
-    res.json({
-      status: 'success',
-      data: {
-        totalRequests,
-        averageDuration: averageDuration[0]?.avg || 0,
-        statusCodes: Object.fromEntries(
-          statusCodes.map(item => [item._id, item.count])
-        ),
-        methodCounts: Object.fromEntries(
-          methodCounts.map(item => [item._id, item.count])
-        ),
-        pathStats: pathStats.map(stat => ({
-          path: stat.path,
-          totalRequests: stat.totalRequests,
-          successfulRequests: stat.successfulRequests,
-          clientErrors: stat.clientErrors,
-          serverErrors: stat.serverErrors,
-          successRate: Math.round(stat.successRate * 100) / 100,
-          clientErrorRate: Math.round(stat.clientErrorRate * 100) / 100,
-          serverErrorRate: Math.round(stat.serverErrorRate * 100) / 100,
-          totalErrorRate: Math.round((stat.clientErrorRate + stat.serverErrorRate) * 100) / 100,
-          avgDuration: Math.round(stat.avgDuration * 100) / 100,
-          errorBreakdown: {
-            clientErrors: {
-              count: stat.clientErrors,
-              percentage: Math.round(stat.clientErrorRate * 100) / 100
+      res.json({
+        status: "success",
+        data: {
+          totalRequests,
+          averageDuration: averageDuration[0]?.avg || 0,
+          statusCodes: Object.fromEntries(
+            statusCodes.map((item) => [item._id, item.count])
+          ),
+          methodCounts: Object.fromEntries(
+            methodCounts.map((item) => [item._id, item.count])
+          ),
+          pathStats: pathStats.map((stat) => ({
+            path: stat.path,
+            totalRequests: stat.totalRequests,
+            successfulRequests: stat.successfulRequests,
+            clientErrors: stat.clientErrors,
+            serverErrors: stat.serverErrors,
+            successRate: Math.round(stat.successRate * 100) / 100,
+            clientErrorRate: Math.round(stat.clientErrorRate * 100) / 100,
+            serverErrorRate: Math.round(stat.serverErrorRate * 100) / 100,
+            totalErrorRate:
+              Math.round((stat.clientErrorRate + stat.serverErrorRate) * 100) /
+              100,
+            avgDuration: Math.round(stat.avgDuration * 100) / 100,
+            errorBreakdown: {
+              clientErrors: {
+                count: stat.clientErrors,
+                percentage: Math.round(stat.clientErrorRate * 100) / 100,
+              },
+              serverErrors: {
+                count: stat.serverErrors,
+                percentage: Math.round(stat.serverErrorRate * 100) / 100,
+              },
             },
-            serverErrors: {
-              count: stat.serverErrors,
-              percentage: Math.round(stat.serverErrorRate * 100) / 100
-            }
-          }
-        }))
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching transaction statistics:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Error fetching transaction statistics'
-    });
+          })),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching transaction statistics:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Error fetching transaction statistics",
+      });
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -478,7 +482,7 @@ router.get('/transactions/stats', protect as unknown as RequestHandler, async (r
  *       500:
  *         description: Server error
  */
-router.post('/transactions', async (req, res) => {
+router.post("/transactions", async (req, res) => {
   try {
     const {
       method,
@@ -491,7 +495,7 @@ router.post('/transactions', async (req, res) => {
       duration,
       timestamp,
       ipAddress,
-      userAgent
+      userAgent,
     } = req.body;
 
     const transaction = await ApiTransaction.create({
@@ -505,22 +509,22 @@ router.post('/transactions', async (req, res) => {
       duration,
       timestamp: timestamp || new Date(),
       ipAddress,
-      userAgent
+      userAgent,
     });
 
     res.status(201).json({
-      status: 'success',
+      status: "success",
       data: {
-        transaction
-      }
+        transaction,
+      },
     });
   } catch (error: any) {
-    console.error('Transaction creation error:', error);
+    console.error("Transaction creation error:", error);
     res.status(500).json({
-      status: 'error',
-      message: 'Error creating transaction log',
+      status: "error",
+      message: "Error creating transaction log",
       error: error.message,
-      details: error.errors
+      details: error.errors,
     });
   }
 });
@@ -885,4 +889,4 @@ router.get('/frontend-errors/stats', protect as unknown as RequestHandler, async
   }
 });
 
-export default router; 
+export default router;
