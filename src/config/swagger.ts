@@ -1,21 +1,24 @@
 import swaggerJsdoc from 'swagger-jsdoc';
+import path from 'path';
 
-const options = {
+const port = process.env.PORT || 3001;
+
+const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
       title: 'Project Health Monitor API',
       version: '1.0.0',
-      description: 'API documentation for Project Health Monitor',
+      description: 'API Documentation for Project Health Monitor',
       contact: {
         name: 'API Support',
-        email: 'support@example.com'
-      }
+        email: 'support@example.com',
+      },
     },
     servers: [
       {
-        url: 'http://localhost:3000',
-        description: 'Development server'
+        url: '/',
+        description: 'Current Server'
       }
     ],
     components: {
@@ -23,15 +26,20 @@ const options = {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
-          bearerFormat: 'JWT'
-        }
-      }
+          bearerFormat: 'JWT',
+        },
+      },
     },
-    security: [{
-      bearerAuth: []
-    }]
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
-  apis: ['./src/routes/*.ts', './src/models/*.ts'], // Path to the API docs
+  apis: [
+    path.join(__dirname, '../routes/*.ts'),
+    path.join(__dirname, '../models/*.ts')
+  ],
 };
 
-export const specs = swaggerJsdoc(options); 
+export const swaggerSpec = swaggerJsdoc(swaggerOptions); 

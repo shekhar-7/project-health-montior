@@ -3,7 +3,12 @@ import { register, login, logout, getMe } from '../controllers/user.controller';
 import { protect } from '../middleware/auth.middleware';
 import { validateUserCredentials } from '../middleware/validation.middleware';
 
-const router = express.Router();
+/**
+ * @swagger
+ * tags:
+ *   name: Users
+ *   description: User management endpoints
+ */
 
 /**
  * @swagger
@@ -47,8 +52,8 @@ const router = express.Router();
  * @swagger
  * /api/users/register:
  *   post:
- *     summary: Register a new user
  *     tags: [Users]
+ *     summary: Register a new user
  *     requestBody:
  *       required: true
  *       content:
@@ -62,22 +67,16 @@ const router = express.Router();
  *             properties:
  *               email:
  *                 type: string
- *                 format: email
  *               password:
  *                 type: string
- *                 format: password
  *               name:
  *                 type: string
  *     responses:
  *       201:
- *         description: User successfully registered
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
- *       400:
- *         description: Invalid input data
+ *         description: User created successfully
  */
+const router = express.Router();
+
 router.post('/register', validateUserCredentials as RequestHandler, register as RequestHandler);
 
 /**
