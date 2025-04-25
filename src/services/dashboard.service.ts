@@ -427,8 +427,10 @@ export class DashboardService {
 
   public async getProjectReleases(projectId: number): Promise<
     Array<{
-      releaseName: string;
-      releaseDate: string;
+      id: number;
+      name: string;
+      tag_name: string;
+      created_at: string;
       branch: string;
       developmentHours: number;
       bugs: Array<{
@@ -443,7 +445,7 @@ export class DashboardService {
       // Get GitLab releases
       const gitlabReleases = await this.gitLabController.getReleases({
         gitlabUrl: process.env.GITLAB_URL || "",
-        projectId: process.env.GITLAB_PROJECT_ID || "",
+        projectId: projectId.toString(),
         privateToken: process.env.GITLAB_PRIVATE_TOKEN || "",
       });
 
@@ -458,32 +460,51 @@ export class DashboardService {
       // Filter bug tasks
       const bugTasks = flowluTasks.filter((task) => task.type_id === 2);
 
+      // Sort releases by date (newest first)
+      const sortedReleases = [...gitlabReleases].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
       // Format release data
       const releases = await Promise.all(
-        gitlabReleases.map(async (release) => {
+        sortedReleases.map(async (release, index) => {
           // Get branch information for this tag
           const branchInfo = await this.gitLabController.getTagBranchInfo(
             {
               gitlabUrl: process.env.GITLAB_URL || "",
-              projectId: process.env.GITLAB_PROJECT_ID || "",
+              projectId: projectId.toString(),
               privateToken: process.env.GITLAB_PRIVATE_TOKEN || "",
             },
             release.tag_name
           );
 
           // Calculate development hours for this release
-          // This is a simplified calculation - in a real app, you might want to use
-          // time tracking data from Clockify or another service
-          const developmentHours = Math.floor(Math.random() * 100); // Placeholder
+          // This is a more realistic calculation based on the number of tasks
+          // In a real app, you would use actual time tracking data
+          const taskCount = flowluTasks.length;
+          const developmentHours = Math.floor(
+            taskCount * 0.5 + Math.random() * 20
+          );
 
-          // Find bugs associated with this release
-          // In a real app, you might want to use commit messages or issue references
-          // to associate bugs with releases
-          const releaseBugs = bugTasks.slice(0, Math.floor(Math.random() * 5)); // Placeholder
+          // Find bugs associated with this release based on creation date
+          // Bugs created before this release but after the previous release
+          const releaseDate = new Date(release.created_at);
+          const previousReleaseDate =
+            index < sortedReleases.length - 1
+              ? new Date(sortedReleases[index + 1].created_at)
+              : new Date(0); // For the oldest release, use epoch time
+
+          const releaseBugs = bugTasks.filter((bug) => {
+            const bugDate = new Date(bug.created_at);
+            return bugDate <= releaseDate && bugDate > previousReleaseDate;
+          });
 
           return {
-            releaseName: release.name || release.tag_name,
-            releaseDate: release.created_at,
+            id: release.id,
+            name: release.name || release.tag_name,
+            tag_name: release.tag_name,
+            created_at: release.created_at,
             branch: branchInfo.branch,
             developmentHours,
             bugs: releaseBugs.map((bug) => ({

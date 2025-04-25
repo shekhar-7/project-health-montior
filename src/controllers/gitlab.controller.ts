@@ -260,6 +260,12 @@ export class GitLabController {
       id: number;
       name: string;
       description: string;
+      namespace: {
+        id: number;
+        name: string;
+        path: string;
+        kind: string;
+      };
     }>
   > {
     try {
@@ -271,6 +277,12 @@ export class GitLabController {
           id: number;
           name: string;
           description: string;
+          namespace: {
+            id: number;
+            name: string;
+            path: string;
+            kind: string;
+          };
         }>
       >(url, {
         headers: {
