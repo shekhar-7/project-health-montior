@@ -1,7 +1,9 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { DashboardController } from "../controllers/dashboard.controller";
 import { DashboardService } from "../services/dashboard.service";
 import { GitLabController } from "../controllers/gitlab.controller";
+import { FlowluService } from "../services/flowlu.service";
+import { ClockifyService } from "../services/clockify.service";
 import {
   gitLabConfig,
   flowluConfig,
@@ -9,16 +11,29 @@ import {
 } from "../config/external-services.config";
 
 const router = Router();
+
+// Initialize services
+const flowluService = new FlowluService(flowluConfig);
+const clockifyService = new ClockifyService(clockifyConfig);
+const gitLabController = new GitLabController();
 const dashboardService = new DashboardService(
   gitLabConfig,
   flowluConfig,
   clockifyConfig
 );
-const gitLabController = new GitLabController();
 const dashboardController = new DashboardController(
   dashboardService,
-  gitLabController
+  gitLabController,
+  flowluService,
+  clockifyService
 );
+
+// Async handler wrapper
+const asyncHandler =
+  (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 
 /**
  * @swagger
@@ -66,7 +81,10 @@ const dashboardController = new DashboardController(
  *       500:
  *         description: Server error
  */
-router.get("/metrics", (req, res) => dashboardController.getMetrics(req, res));
+router.get(
+  "/metrics",
+  asyncHandler((req, res) => dashboardController.getMetrics(req, res))
+);
 
 /**
  * @swagger
@@ -117,8 +135,9 @@ router.get("/metrics", (req, res) => dashboardController.getMetrics(req, res));
  *       500:
  *         description: Server error
  */
-router.get("/release-metrics", (req, res) =>
-  dashboardController.getReleaseMetrics(req, res)
+router.get(
+  "/release-metrics",
+  asyncHandler((req, res) => dashboardController.getReleaseMetrics(req, res))
 );
 
 /**
@@ -170,7 +189,7 @@ router.get("/release-metrics", (req, res) =>
  */
 router.get(
   "/task-metrics",
-  dashboardController.getTaskMetrics.bind(dashboardController)
+  asyncHandler((req, res) => dashboardController.getTaskMetrics(req, res))
 );
 
 /**
@@ -219,7 +238,7 @@ router.get(
  */
 router.get(
   "/bug-metrics",
-  dashboardController.getBugMetrics.bind(dashboardController)
+  asyncHandler((req, res) => dashboardController.getBugMetrics(req, res))
 );
 
 /**
@@ -254,8 +273,9 @@ router.get(
  *       500:
  *         description: Server error
  */
-router.get("/projects/search", (req, res) =>
-  dashboardController.searchProjects(req, res)
+router.get(
+  "/projects/search",
+  asyncHandler((req, res) => dashboardController.searchProjects(req, res))
 );
 
 /**
@@ -320,7 +340,7 @@ router.get("/projects/search", (req, res) =>
  */
 router.get(
   "/project-releases",
-  dashboardController.getProjectReleases.bind(dashboardController)
+  asyncHandler((req, res) => dashboardController.getProjectReleases(req, res))
 );
 
 /**
@@ -365,7 +385,7 @@ router.get(
  */
 router.get(
   "/releases",
-  dashboardController.getReleases.bind(dashboardController)
+  asyncHandler((req, res) => dashboardController.getReleases(req, res))
 );
 
 /**
@@ -401,20 +421,19 @@ router.get(
  */
 router.get(
   "/gitlab-projects",
-  dashboardController.getGitLabProjects.bind(dashboardController)
+  asyncHandler((req, res) => dashboardController.getGitLabProjects(req, res))
 );
 
-// Get metrics
-router.get("/metrics", (req, res) => dashboardController.getMetrics(req, res));
-
 // Get dashboard metrics
-router.get("/dashboard", (req, res) =>
-  dashboardController.getDashboardMetrics(req, res)
+router.get(
+  "/dashboard-metrics",
+  asyncHandler((req, res) => dashboardController.getDashboardMetrics(req, res))
 );
 
 // Get release metrics
-router.get("/release", (req, res) =>
-  dashboardController.getReleaseMetrics(req, res)
+router.get(
+  "/release",
+  asyncHandler((req, res) => dashboardController.getReleaseMetrics(req, res))
 );
 
 export default router;

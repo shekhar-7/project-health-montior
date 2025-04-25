@@ -11,6 +11,8 @@ import {
 } from "../config/external-services.config";
 import { z } from "zod";
 import { GitLabController } from "../controllers/gitlab.controller";
+import { FlowluService } from "../services/flowlu.service";
+import { ClockifyService } from "../services/clockify.service";
 
 // Validation schemas
 const MetricsQuerySchema = z.object({
@@ -26,13 +28,19 @@ const ProjectSearchSchema = z.object({
 export class DashboardController {
   private dashboardService: DashboardService;
   private gitLabController: GitLabController;
+  private flowluService: FlowluService;
+  private clockifyService: ClockifyService;
 
   constructor(
     dashboardService: DashboardService,
-    gitLabController: GitLabController
+    gitLabController: GitLabController,
+    flowluService: FlowluService,
+    clockifyService: ClockifyService
   ) {
     this.dashboardService = dashboardService;
     this.gitLabController = gitLabController;
+    this.flowluService = flowluService;
+    this.clockifyService = clockifyService;
   }
 
   public async searchProjects(req: Request, res: Response) {
@@ -100,8 +108,101 @@ export class DashboardController {
   public async getReleaseMetrics(req: Request, res: Response) {
     try {
       const comparison = MetricsQuerySchema.parse(req.query);
-      const metrics = await this.dashboardService.getReleaseMetrics(comparison);
-      res.json(metrics);
+
+      // Get GitLab configuration
+      const gitLabConfig = {
+        gitlabUrl: process.env.GITLAB_URL || "",
+        projectId: process.env.GITLAB_PROJECT_ID || "",
+        privateToken: process.env.GITLAB_PRIVATE_TOKEN || "",
+      };
+
+      // Get releases
+      const releases = await this.gitLabController.getReleases(gitLabConfig);
+
+      // Get Flowlu users
+      const users = await this.flowluService.getAllUsers();
+
+      // Get Flowlu projects
+      const projects = await this.flowluService.getAllProjects();
+
+      // Filter projects if projectId is provided
+      const targetProjects = comparison.projectId
+        ? projects.filter((p) => p.id === comparison.projectId)
+        : projects;
+
+      if (targetProjects.length === 0) {
+        throw new Error(`Project with ID ${comparison.projectId} not found`);
+      }
+
+      // Get all tasks for the project
+      const allTasks = await this.flowluService.getProjectTasks(
+        targetProjects[0].id,
+        targetProjects[0].name,
+        users
+      );
+
+      // Process each release
+      const releaseMetrics = await Promise.all(
+        releases.map(async (release) => {
+          // Get branch information for this tag
+          const branchInfo = await this.gitLabController.getTagBranchInfo(
+            gitLabConfig,
+            release.tag_name
+          );
+
+          // Find tasks that were completed between this release and the previous one
+          // This is a simplified approach - in a real app, you might want to use
+          // commit messages or issue references to associate tasks with releases
+          const releaseTasks = allTasks.filter((task) => {
+            const taskDate = new Date(task.created_at);
+            const releaseDate = new Date(release.created_at);
+            return taskDate <= releaseDate;
+          });
+
+          // Count bugs
+          const bugTasks = releaseTasks.filter((task) => task.type_id === 2);
+
+          // Calculate development time
+          let developmentTime = 0;
+          for (const task of releaseTasks) {
+            if (task.cf_8 && task.cf_9) {
+              const duration = await this.clockifyService.getTaskActualDuration(
+                task.cf_8,
+                task.cf_9
+              );
+              developmentTime += duration;
+            }
+          }
+
+          return {
+            releaseName: release.name || release.tag_name,
+            releaseDate: release.created_at,
+            branch: branchInfo.branch,
+            developmentTime,
+            bugCount: bugTasks.length,
+            totalTasks: releaseTasks.length,
+          };
+        })
+      );
+
+      // Get metrics between the specified tags
+      const metrics = await this.dashboardService.calculateMetrics(
+        comparison.olderTag,
+        comparison.newerTag,
+        comparison.projectId
+      );
+
+      return res.json({
+        releases: releaseMetrics,
+        comparison: {
+          commits: metrics.commits,
+          totalCommits: metrics.totalCommits,
+          totalFeatures: metrics.totalFeatures,
+          totalBugs: metrics.totalBugs,
+          totalDevelopmentTime: metrics.totalDevelopmentTime,
+          totalQaTime: metrics.totalQaTime,
+        },
+      });
     } catch (error) {
       console.error("Error getting release metrics:", error);
       res.status(500).json({
@@ -194,13 +295,11 @@ export class DashboardController {
         });
       }
 
-      const gitLabConfig = {
-        gitlabUrl: process.env.GITLAB_URL || "",
-        projectId: projectId as string,
-        privateToken: process.env.GITLAB_PRIVATE_TOKEN || "",
-      };
+      // Get GitLab releases with additional metrics
+      const releases = await this.dashboardService.getProjectReleases(
+        Number(projectId)
+      );
 
-      const releases = await this.gitLabController.getReleases(gitLabConfig);
       res.json(releases);
     } catch (error) {
       console.error("Error getting releases:", error);
@@ -239,7 +338,59 @@ export class DashboardController {
         })
       );
 
-      res.json(projectsWithReleases);
+      // Group projects by namespace
+      const groupedProjects = projectsWithReleases.reduce(
+        (acc, project) => {
+          const namespaceName = project.namespace?.name || "Unknown";
+
+          if (!acc[namespaceName]) {
+            acc[namespaceName] = {
+              namespace: {
+                name: namespaceName,
+                id: project.namespace?.id || 0,
+                path: project.namespace?.path || "",
+                kind: project.namespace?.kind || "unknown",
+              },
+              projects: [],
+              totalReleaseCount: 0,
+            };
+          }
+
+          acc[namespaceName].projects.push({
+            id: project.id,
+            name: project.name,
+            description: project.description,
+            releaseCount: project.releaseCount,
+          });
+
+          acc[namespaceName].totalReleaseCount += project.releaseCount;
+
+          return acc;
+        },
+        {} as Record<
+          string,
+          {
+            namespace: {
+              name: string;
+              id: number;
+              path: string;
+              kind: string;
+            };
+            projects: Array<{
+              id: number;
+              name: string;
+              description: string;
+              releaseCount: number;
+            }>;
+            totalReleaseCount: number;
+          }
+        >
+      );
+
+      // Convert to array format
+      const result = Object.values(groupedProjects);
+
+      res.json(result);
     } catch (error) {
       console.error("Error getting GitLab projects:", error);
       res.status(500).json({
