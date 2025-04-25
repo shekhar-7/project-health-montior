@@ -254,4 +254,34 @@ export class GitLabController {
       return { branch: "unknown", commitId: "unknown" };
     }
   }
+
+  public async getAllProjects(config: GitLabConfig): Promise<
+    Array<{
+      id: number;
+      name: string;
+      description: string;
+    }>
+  > {
+    try {
+      const baseUrl = config.gitlabUrl.split("/api")[0] + "/api/v4";
+      const url = `${baseUrl}/projects`;
+
+      const response = await axios.get<
+        Array<{
+          id: number;
+          name: string;
+          description: string;
+        }>
+      >(url, {
+        headers: {
+          "PRIVATE-TOKEN": config.privateToken,
+        },
+      });
+
+      return response.data || [];
+    } catch (error) {
+      console.error("Error getting GitLab projects:", error);
+      throw error;
+    }
+  }
 }

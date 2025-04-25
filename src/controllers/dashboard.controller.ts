@@ -210,4 +210,42 @@ export class DashboardController {
       });
     }
   }
+
+  public async getGitLabProjects(req: Request, res: Response) {
+    try {
+      const gitLabConfig = {
+        gitlabUrl: process.env.GITLAB_URL || "",
+        projectId: process.env.GITLAB_PROJECT_ID || "",
+        privateToken: process.env.GITLAB_PRIVATE_TOKEN || "",
+      };
+
+      // Get all projects
+      const projects = await this.gitLabController.getAllProjects(gitLabConfig);
+
+      // Get release counts for each project
+      const projectsWithReleases = await Promise.all(
+        projects.map(async (project) => {
+          const projectConfig = {
+            ...gitLabConfig,
+            projectId: project.id.toString(),
+          };
+          const releases = await this.gitLabController.getReleases(
+            projectConfig
+          );
+          return {
+            ...project,
+            releaseCount: releases.length,
+          };
+        })
+      );
+
+      res.json(projectsWithReleases);
+    } catch (error) {
+      console.error("Error getting GitLab projects:", error);
+      res.status(500).json({
+        error: "Failed to get GitLab projects",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
 }

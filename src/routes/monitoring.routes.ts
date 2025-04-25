@@ -1,6 +1,6 @@
-import express, { RequestHandler } from 'express';
-import { ApiTransaction } from '../models/api-transaction.model';
-import { protect } from '../middleware/auth.middleware';
+import express, { RequestHandler } from "express";
+import { ApiTransaction } from "../models/api-transaction.model";
+import { protect } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
@@ -126,46 +126,50 @@ const router = express.Router();
  *       403:
  *         description: Not authorized to view monitoring data
  */
-router.get('/transactions', protect as RequestHandler, async (req, res) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
-    const skip = (page - 1) * limit;
+router.get(
+  "/transactions",
+  protect as unknown as RequestHandler,
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
+      const skip = (page - 1) * limit;
 
-    // Build query
-    const query: any = {};
-    if (req.query.method) {
-      query.method = req.query.method;
-    }
-    if (req.query.status) {
-      query.responseStatus = parseInt(req.query.status as string);
-    }
-
-    const transactions = await ApiTransaction.find(query)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await ApiTransaction.countDocuments(query);
-
-    res.json({
-      status: 'success',
-      data: {
-        transactions,
-        pagination: {
-          total,
-          page,
-          pages: Math.ceil(total / limit)
-        }
+      // Build query
+      const query: any = {};
+      if (req.query.method) {
+        query.method = req.query.method;
       }
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: 'Error fetching transactions'
-    });
+      if (req.query.status) {
+        query.responseStatus = parseInt(req.query.status as string);
+      }
+
+      const transactions = await ApiTransaction.find(query)
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const total = await ApiTransaction.countDocuments(query);
+
+      res.json({
+        status: "success",
+        data: {
+          transactions,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: "error",
+        message: "Error fetching transactions",
+      });
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -198,152 +202,158 @@ router.get('/transactions', protect as RequestHandler, async (req, res) => {
  *                     methodCounts:
  *                       type: object
  */
-router.get('/transactions/stats', protect as RequestHandler, async (req, res) => {
-  try {
-    const [
-      totalRequests,
-      averageDuration,
-      statusCodes,
-      methodCounts,
-      pathStats
-    ] = await Promise.all([
-      ApiTransaction.countDocuments(),
-      ApiTransaction.aggregate([
-        { $group: { _id: '$mainRoute', avg: { $avg: '$duration' } } }
-      ]),
-      ApiTransaction.aggregate([
-        { $group: { _id: '$responseStatus', count: { $sum: 1 } } }
-      ]),
-      ApiTransaction.aggregate([
-        { $group: { _id: '$method', count: { $sum: 1 } } }
-      ]),
-      ApiTransaction.aggregate([
-        {
-          $group: {
-            _id: '$mainRoute',
-            totalRequests: { $sum: 1 },
-            successfulRequests: {
-              $sum: {
-                $cond: [
-                  { $and: [
-                    { $gte: ['$responseStatus', 200] },
-                    { $lt: ['$responseStatus', 300] }
-                  ]},
-                  1,
-                  0
-                ]
-              }
-            },
-            clientErrors: {
-              $sum: {
-                $cond: [
-                  { $and: [
-                    { $gte: ['$responseStatus', 400] },
-                    { $lt: ['$responseStatus', 500] }
-                  ]},
-                  1,
-                  0
-                ]
-              }
-            },
-            serverErrors: {
-              $sum: {
-                $cond: [
-                  { $gte: ['$responseStatus', 500] },
-                  1,
-                  0
-                ]
-              }
-            },
-            avgDuration: { $avg: '$duration' },
-            // Group status codes for detailed error tracking
-            statusCodes: {
-              $push: {
-                status: '$responseStatus',
-                count: 1
-              }
-            }
-          }
-        },
-        {
-          $project: {
-            path: '$_id',
-            originalPaths: '$paths',
-            totalRequests: 1,
-            successfulRequests: 1,
-            clientErrors: 1,
-            serverErrors: 1,
-            successRate: {
-              $multiply: [
-                { $divide: ['$successfulRequests', '$totalRequests'] },
-                100
-              ]
-            },
-            clientErrorRate: {
-              $multiply: [
-                { $divide: ['$clientErrors', '$totalRequests'] },
-                100
-              ]
-            },
-            serverErrorRate: {
-              $multiply: [
-                { $divide: ['$serverErrors', '$totalRequests'] },
-                100
-              ]
-            },
-            avgDuration: 1,
-            statusCodes: 1
-          }
-        },
-        {
-          $sort: { totalRequests: -1 }
-        }
-      ])
-    ]);
-
-    res.json({
-      status: 'success',
-      data: {
+router.get(
+  "/transactions/stats",
+  protect as unknown as RequestHandler,
+  async (req, res) => {
+    try {
+      const [
         totalRequests,
-        averageDuration: averageDuration[0]?.avg || 0,
-        statusCodes: Object.fromEntries(
-          statusCodes.map(item => [item._id, item.count])
-        ),
-        methodCounts: Object.fromEntries(
-          methodCounts.map(item => [item._id, item.count])
-        ),
-        pathStats: pathStats.map(stat => ({
-          path: stat.path,
-          totalRequests: stat.totalRequests,
-          successfulRequests: stat.successfulRequests,
-          clientErrors: stat.clientErrors,
-          serverErrors: stat.serverErrors,
-          successRate: Math.round(stat.successRate * 100) / 100,
-          clientErrorRate: Math.round(stat.clientErrorRate * 100) / 100,
-          serverErrorRate: Math.round(stat.serverErrorRate * 100) / 100,
-          totalErrorRate: Math.round((stat.clientErrorRate + stat.serverErrorRate) * 100) / 100,
-          avgDuration: Math.round(stat.avgDuration * 100) / 100,
-          errorBreakdown: {
-            clientErrors: {
-              count: stat.clientErrors,
-              percentage: Math.round(stat.clientErrorRate * 100) / 100
+        averageDuration,
+        statusCodes,
+        methodCounts,
+        pathStats,
+      ] = await Promise.all([
+        ApiTransaction.countDocuments(),
+        ApiTransaction.aggregate([
+          { $group: { _id: "$mainRoute", avg: { $avg: "$duration" } } },
+        ]),
+        ApiTransaction.aggregate([
+          { $group: { _id: "$responseStatus", count: { $sum: 1 } } },
+        ]),
+        ApiTransaction.aggregate([
+          { $group: { _id: "$method", count: { $sum: 1 } } },
+        ]),
+        ApiTransaction.aggregate([
+          {
+            $group: {
+              _id: "$mainRoute",
+              totalRequests: { $sum: 1 },
+              successfulRequests: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $gte: ["$responseStatus", 200] },
+                        { $lt: ["$responseStatus", 300] },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+              clientErrors: {
+                $sum: {
+                  $cond: [
+                    {
+                      $and: [
+                        { $gte: ["$responseStatus", 400] },
+                        { $lt: ["$responseStatus", 500] },
+                      ],
+                    },
+                    1,
+                    0,
+                  ],
+                },
+              },
+              serverErrors: {
+                $sum: {
+                  $cond: [{ $gte: ["$responseStatus", 500] }, 1, 0],
+                },
+              },
+              avgDuration: { $avg: "$duration" },
+              // Group status codes for detailed error tracking
+              statusCodes: {
+                $push: {
+                  status: "$responseStatus",
+                  count: 1,
+                },
+              },
             },
-            serverErrors: {
-              count: stat.serverErrors,
-              percentage: Math.round(stat.serverErrorRate * 100) / 100
-            }
-          }
-        }))
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching transaction statistics:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Error fetching transaction statistics'
-    });
+          },
+          {
+            $project: {
+              path: "$_id",
+              originalPaths: "$paths",
+              totalRequests: 1,
+              successfulRequests: 1,
+              clientErrors: 1,
+              serverErrors: 1,
+              successRate: {
+                $multiply: [
+                  { $divide: ["$successfulRequests", "$totalRequests"] },
+                  100,
+                ],
+              },
+              clientErrorRate: {
+                $multiply: [
+                  { $divide: ["$clientErrors", "$totalRequests"] },
+                  100,
+                ],
+              },
+              serverErrorRate: {
+                $multiply: [
+                  { $divide: ["$serverErrors", "$totalRequests"] },
+                  100,
+                ],
+              },
+              avgDuration: 1,
+              statusCodes: 1,
+            },
+          },
+          {
+            $sort: { totalRequests: -1 },
+          },
+        ]),
+      ]);
+
+      res.json({
+        status: "success",
+        data: {
+          totalRequests,
+          averageDuration: averageDuration[0]?.avg || 0,
+          statusCodes: Object.fromEntries(
+            statusCodes.map((item) => [item._id, item.count])
+          ),
+          methodCounts: Object.fromEntries(
+            methodCounts.map((item) => [item._id, item.count])
+          ),
+          pathStats: pathStats.map((stat) => ({
+            path: stat.path,
+            totalRequests: stat.totalRequests,
+            successfulRequests: stat.successfulRequests,
+            clientErrors: stat.clientErrors,
+            serverErrors: stat.serverErrors,
+            successRate: Math.round(stat.successRate * 100) / 100,
+            clientErrorRate: Math.round(stat.clientErrorRate * 100) / 100,
+            serverErrorRate: Math.round(stat.serverErrorRate * 100) / 100,
+            totalErrorRate:
+              Math.round((stat.clientErrorRate + stat.serverErrorRate) * 100) /
+              100,
+            avgDuration: Math.round(stat.avgDuration * 100) / 100,
+            errorBreakdown: {
+              clientErrors: {
+                count: stat.clientErrors,
+                percentage: Math.round(stat.clientErrorRate * 100) / 100,
+              },
+              serverErrors: {
+                count: stat.serverErrors,
+                percentage: Math.round(stat.serverErrorRate * 100) / 100,
+              },
+            },
+          })),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching transaction statistics:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Error fetching transaction statistics",
+      });
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -365,7 +375,7 @@ router.get('/transactions/stats', protect as RequestHandler, async (req, res) =>
  *       500:
  *         description: Server error
  */
-router.post('/transactions', async (req, res) => {
+router.post("/transactions", async (req, res) => {
   try {
     const {
       method,
@@ -378,7 +388,7 @@ router.post('/transactions', async (req, res) => {
       duration,
       timestamp,
       ipAddress,
-      userAgent
+      userAgent,
     } = req.body;
 
     const transaction = await ApiTransaction.create({
@@ -392,24 +402,24 @@ router.post('/transactions', async (req, res) => {
       duration,
       timestamp: timestamp || new Date(),
       ipAddress,
-      userAgent
+      userAgent,
     });
 
     res.status(201).json({
-      status: 'success',
+      status: "success",
       data: {
-        transaction
-      }
+        transaction,
+      },
     });
   } catch (error: any) {
-    console.error('Transaction creation error:', error);
+    console.error("Transaction creation error:", error);
     res.status(500).json({
-      status: 'error',
-      message: 'Error creating transaction log',
+      status: "error",
+      message: "Error creating transaction log",
       error: error.message,
-      details: error.errors
+      details: error.errors,
     });
   }
 });
 
-export default router; 
+export default router;
