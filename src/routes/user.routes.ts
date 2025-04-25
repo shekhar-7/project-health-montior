@@ -1,7 +1,7 @@
-import express, { RequestHandler } from 'express';
-import { register, login, logout, getMe } from '../controllers/user.controller';
-import { protect } from '../middleware/auth.middleware';
-import { validateUserCredentials } from '../middleware/validation.middleware';
+import express, { RequestHandler } from "express";
+import { register, login, logout, getMe } from "../controllers/user.controller";
+import { protect } from "../middleware/auth.middleware";
+import { validateUserCredentials } from "../middleware/validation.middleware";
 
 /**
  * @swagger
@@ -77,7 +77,11 @@ import { validateUserCredentials } from '../middleware/validation.middleware';
  */
 const router = express.Router();
 
-router.post('/register', validateUserCredentials as RequestHandler, register as RequestHandler);
+router.post(
+  "/register",
+  validateUserCredentials as unknown as RequestHandler,
+  register as unknown as RequestHandler
+);
 
 /**
  * @swagger
@@ -111,7 +115,11 @@ router.post('/register', validateUserCredentials as RequestHandler, register as 
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', validateUserCredentials as RequestHandler, login as RequestHandler);
+router.post(
+  "/login",
+  validateUserCredentials as unknown as RequestHandler,
+  login as unknown as RequestHandler
+);
 
 /**
  * @swagger
@@ -127,7 +135,11 @@ router.post('/login', validateUserCredentials as RequestHandler, login as Reques
  *       401:
  *         description: Not authenticated
  */
-router.post('/logout', protect as RequestHandler, logout as RequestHandler);
+router.post(
+  "/logout",
+  protect as unknown as RequestHandler,
+  logout as unknown as RequestHandler
+);
 
 /**
  * @swagger
@@ -156,6 +168,10 @@ router.post('/logout', protect as RequestHandler, logout as RequestHandler);
  *       401:
  *         description: Not authenticated
  */
-router.get('/me', protect as RequestHandler, getMe as RequestHandler);
+router.get(
+  "/me",
+  protect as unknown as RequestHandler,
+  getMe as unknown as RequestHandler
+);
 
 export default router;
